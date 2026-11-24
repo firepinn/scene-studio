@@ -127,6 +127,9 @@ def test_wled_colors_spread_over_the_gradient():
 
     colors = [(0.1, 0.1), (0.2, 0.2), (0.3, 0.3), (0.4, 0.4), (0.5, 0.4)]
     assert wled_colors(colors) == [(0.1, 0.1), (0.3, 0.3), (0.5, 0.4)]
+    # Soho: two nearly equal blues, peach and warm white -> the blue, peach and warm white
+    soho = [(0.213, 0.2867), (0.4539, 0.3345), (0.2053, 0.2566), (0.4651, 0.4117), (0.213, 0.2867)]
+    assert wled_colors(soho) == [(0.213, 0.2867), (0.4539, 0.3345), (0.4651, 0.4117)]
     assert wled_colors(colors[:2]) == colors[:2]
     # the first color again at the end counts once
     assert wled_colors([(0.1, 0.1), (0.2, 0.2), (0.3, 0.3), (0.1, 0.1)]) == [(0.1, 0.1), (0.2, 0.2), (0.3, 0.3)]
