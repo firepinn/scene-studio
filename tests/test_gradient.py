@@ -126,13 +126,19 @@ def test_wled_colors_spread_over_the_gradient():
     from custom_components.scene_studio.gradient import wled_colors
 
     colors = [(0.1, 0.1), (0.2, 0.2), (0.3, 0.3), (0.4, 0.4), (0.5, 0.4)]
-    assert wled_colors(colors) == [(0.1, 0.1), (0.3, 0.3), (0.5, 0.4)]
+    # the three that differ most; the one furthest from the other two in the middle
+    assert wled_colors(colors) == [(0.3, 0.3), (0.1, 0.1), (0.5, 0.4)]
+    # Arctic aurora: light blue, blue and mint -> mint (most different) in the middle
+    arctic = [(0.2133, 0.2632), (0.1876, 0.1952), (0.2582, 0.3596), (0.2133, 0.2632), (0.2133, 0.2632)]
+    assert wled_colors(arctic) == [(0.2133, 0.2632), (0.2582, 0.3596), (0.1876, 0.1952)]
     # Soho: two nearly equal blues, peach and warm white -> the blue, peach and warm white
     soho = [(0.213, 0.2867), (0.4539, 0.3345), (0.2053, 0.2566), (0.4651, 0.4117), (0.213, 0.2867)]
-    assert wled_colors(soho) == [(0.213, 0.2867), (0.4539, 0.3345), (0.4651, 0.4117)]
+    picked = wled_colors(soho)
+    assert sorted(picked) == sorted([(0.213, 0.2867), (0.4539, 0.3345), (0.4651, 0.4117)])
+    assert picked[1] == (0.213, 0.2867)  # the blue differs most from peach and warm white
     assert wled_colors(colors[:2]) == colors[:2]
     # the first color again at the end counts once
-    assert wled_colors([(0.1, 0.1), (0.2, 0.2), (0.3, 0.3), (0.1, 0.1)]) == [(0.1, 0.1), (0.2, 0.2), (0.3, 0.3)]
+    assert sorted(wled_colors([(0.1, 0.1), (0.2, 0.2), (0.3, 0.3), (0.1, 0.1)])) == [(0.1, 0.1), (0.2, 0.2), (0.3, 0.3)]
 
 
 def _wled_lights(hass, segments):

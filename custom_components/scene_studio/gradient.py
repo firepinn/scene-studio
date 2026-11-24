@@ -63,22 +63,29 @@ def gradient_colors(preset_colors, first_color) -> list:
 
 
 def wled_colors(colors) -> list:
-    """Up to three colors for a WLED segment: the three that differ most, in the order of the preset.
+    """Up to three colors for a WLED segment: the three that differ most, the most different one in the
+    middle (otherwise in the order of the preset).
 
     Repeated colors count once (presets often end with their first color again). Picking by
     position instead can take two nearly equal colors, which then look like one long piece."""
     colors = list(dict.fromkeys(tuple(c) for c in colors))
-    if len(colors) <= WLED_MAX_COLORS:
-        return colors
 
     def distance(a, b):
         return ((a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2) ** 0.5
 
-    best = max(
-        combinations(range(len(colors)), WLED_MAX_COLORS),
-        key=lambda idx: min(distance(colors[i], colors[j]) for i, j in combinations(idx, 2)),
-    )
-    return [colors[i] for i in best]
+    if len(colors) > WLED_MAX_COLORS:
+        best = max(
+            combinations(range(len(colors)), WLED_MAX_COLORS),
+            key=lambda idx: min(distance(colors[i], colors[j]) for i, j in combinations(idx, 2)),
+        )
+        colors = [colors[i] for i in best]
+    if len(colors) == WLED_MAX_COLORS:
+        # The color that differs most from the other two goes in the middle: two similar colors next to
+        # each other look like one long piece of the strip, with the third color only at one end
+        middle = max(range(3), key=lambda i: sum(distance(colors[i], colors[j]) for j in range(3) if j != i))
+        ends = [c for i, c in enumerate(colors) if i != middle]
+        colors = [ends[0], colors[middle], ends[1]]
+    return colors
 
 
 class GradientLights:
