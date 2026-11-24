@@ -78,7 +78,8 @@ The colors of the gradient are exactly the colors of the preset, as saturated as
 Segments of [WLED](https://kno.wled.ge/) strips (the light entities of the WLED integration) are
 gradient lamps too. A segment has three color slots, so it gets up to three colors of the preset,
 spread over the gradient (a color the preset repeats counts once). Scene Studio sends them to the
-WLED JSON API of the strip with the effect **Palette** (standing still) and the palette
+WLED JSON API of the strip with the effect **Palette** (standing still, the whole palette once along
+the strip, whatever its sliders were set to before) and the palette
 **\* Color Gradient**, which blends the three colors along the segment; the transition of the scene
 is used for this change only. A strip with several segments gets a gradient per segment. Presets
 with one color switch a segment to **Solid**, so the gradient of the last scene does not stay around

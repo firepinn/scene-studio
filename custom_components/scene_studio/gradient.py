@@ -24,8 +24,8 @@ _LOGGER = logging.getLogger(__name__)
 MAX_GRADIENT_COLORS = 5
 GRADIENT_STYLE = "linear"
 
-# WLED: a segment has three color slots; effect 65 "Palette" shows the palette standing still with
-# speed 0, palette 4 "* Color Gradient" is the gradient of the three slots
+# WLED: a segment has three color slots; effect 65 "Palette" shows the palette along the strip,
+# palette 4 "* Color Gradient" is the gradient of the three slots
 WLED_MAX_COLORS = 3
 WLED_FX_SOLID = 0
 WLED_FX_PALETTE = 65
@@ -203,7 +203,11 @@ class GradientLights:
         colors = wled_colors(colors)
         seg = {"id": segment, "on": True, "col": [list(color_xy_to_RGB(float(x), float(y))) for x, y in colors]}
         if len(colors) > 1:
-            seg.update({"fx": WLED_FX_PALETTE, "sx": 0, "pal": WLED_PAL_COLOR_GRADIENT})
+            # Palette: shift 0, size 128 = the palette exactly once, rotation 0 = along the strip (128 turns
+            # it by 90 degrees: one color on a 1D strip), no animated shift or rotation. Set every time,
+            # because the segment keeps the slider values of earlier effects.
+            seg.update({"fx": WLED_FX_PALETTE, "pal": WLED_PAL_COLOR_GRADIENT,
+                        "sx": 0, "ix": 128, "c1": 0, "o1": False, "o2": False})
         else:
             seg["fx"] = WLED_FX_SOLID
         payload = {"on": True, "seg": [seg]}
