@@ -73,6 +73,18 @@ one color like any other lamp. Without Zigbee2MQTT (e.g. Hue Bridge) the lamps g
 The colors of the gradient are exactly the colors of the preset, as saturated as on the other lamps.
 (Up to 3.3, gradients came out pale: Zigbee2MQTT reads gradient colors without the usual sRGB gamma.)
 
+### WLED strips
+
+Segments of [WLED](https://kno.wled.ge/) strips (the light entities of the WLED integration) are
+gradient lamps too. A segment has three color slots, so it gets up to three colors of the preset,
+spread over the gradient (a color the preset repeats counts once). Scene Studio sends them to the
+WLED JSON API of the strip with the effect **Palette** (standing still) and the palette
+**\* Color Gradient**, which blends the three colors along the segment; the transition of the scene
+is used for this change only. A strip with several segments gets a gradient per segment. Presets
+with one color switch a segment to **Solid**, so the gradient of the last scene does not stay around
+the new color. The master light of a strip with several segments (brightness only) is not a
+gradient lamp. `gradient: false` gives WLED segments one color as before.
+
 ## Optional lights
 
 Lights in `optional` take part **only if they are on** when the scene starts. A light that is off

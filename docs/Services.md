@@ -29,7 +29,7 @@ Applies a preset once.
 | `keep_groups` | | Light groups controlled as one light |
 | `optional` | | Lights that take part only if they are on |
 | `light_brightness` | | Brightness in percent per light, e.g. `{light.strip: 20}`; 0 = off at the start |
-| `gradient` | | Default `true`: gradient lamps in Zigbee2MQTT show all colors of the preset ([details](Lights%20of%20a%20scene.md#gradient-lamps)); `false` = one color |
+| `gradient` | | Default `true`: gradient lamps in Zigbee2MQTT and WLED segments show all colors of the preset ([details](Lights%20of%20a%20scene.md#gradient-lamps)); `false` = one color |
 | `saturation` | | Color intensity −100 … 100, default 0: more vivid (+) or paler (−) colors, the hue stays ([details](Saved%20scenes.md#color-intensity)) |
 
 ### `start_dynamic_scene`

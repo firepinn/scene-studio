@@ -23,6 +23,10 @@ be installed next to it; `migrate.py` imports data from Scene Presets (domain `s
   - `gradient.py` - gradient lamps (Hue Signe, Play gradient … in Zigbee2MQTT): found via
     `+/bridge/devices`, mapped to light entities by the IEEE address in the device identifiers;
     `apply_preset` sends them all preset colors as `gradient` over MQTT (option `gradient`, default true)
+    WLED segment lights (unique id `<mac>_<segment>` of the WLED integration, host from its config entry)
+    are gradient lamps too: up to 3 colors (`wled_colors`) go to `http://<host>/json/state` as `col` with
+    effect 65 Palette and palette 4 "* Color Gradient"; one-color presets switch them to Solid
+    (`needs_single_color`)
     Zigbee2MQTT reads gradient hex colors as **linear Wide RGB D65 without gamma** (and reports them
     in reverse order): `_hex()` converts xy the same way, never via `color_xy_to_RGB` (pale colors)
   - `music_scenes.py` - music scenes: saved scenes with the preset Music (`MUSIC_PRESET_ID`) take the

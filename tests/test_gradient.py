@@ -120,3 +120,91 @@ async def test_gradient_lights_found_from_the_z2m_device_list(hass: HomeAssistan
     gradient._map_entities()
     assert gradient.is_gradient("light.signe_lamp")
     assert not gradient.is_gradient("light.hue_lamp")
+
+
+def test_wled_colors_spread_over_the_gradient():
+    from custom_components.scene_studio.gradient import wled_colors
+
+    colors = [(0.1, 0.1), (0.2, 0.2), (0.3, 0.3), (0.4, 0.4), (0.5, 0.4)]
+    assert wled_colors(colors) == [(0.1, 0.1), (0.3, 0.3), (0.5, 0.4)]
+    assert wled_colors(colors[:2]) == colors[:2]
+    # the first color again at the end counts once
+    assert wled_colors([(0.1, 0.1), (0.2, 0.2), (0.3, 0.3), (0.1, 0.1)]) == [(0.1, 0.1), (0.2, 0.2), (0.3, 0.3)]
+
+
+def _wled_lights(hass, segments):
+    """A WLED strip at 192.0.2.10 with the given segment ids; the master light exists from 2 segments on."""
+    from homeassistant.helpers import entity_registry as er
+    from pytest_homeassistant_custom_component.common import MockConfigEntry
+
+    entry = MockConfigEntry(domain="wled", data={"host": "192.0.2.10"})
+    entry.add_to_hass(hass)
+    ent_reg = er.async_get(hass)
+    attrs = {"supported_color_modes": ["rgb"], "color_mode": "rgb"}
+    for segment in segments:
+        ent_reg.async_get_or_create("light", "wled", f"aabbccddeeff_{segment}", config_entry=entry,
+                                    suggested_object_id=f"strip_{segment}")
+        hass.states.async_set(f"light.strip_{segment}", "off", attrs)
+    if len(segments) > 1:
+        ent_reg.async_get_or_create("light", "wled", "aabbccddeeff", config_entry=entry,
+                                    suggested_object_id="strip_master")
+        hass.states.async_set("light.strip_master", "on", {"supported_color_modes": ["brightness"]})
+
+
+async def test_wled_segment_gets_a_palette_gradient(hass: HomeAssistant, monkeypatch, userdata, aioclient_mock):
+    published, turned_on = await _setup(hass, monkeypatch)
+    _wled_lights(hass, [0])
+    aioclient_mock.post("http://192.0.2.10/json/state", json={"success": True})
+    gradient = runtime(hass).gradient
+    assert gradient.is_gradient("light.strip_0")
+    assert not gradient.is_gradient("light.bulb")
+
+    await hass.services.async_call("scene_studio", "apply_preset", {
+        "preset_id": PRESET, "targets": {"entity_id": ["light.strip_0", "light.bulb"]}, "transition": 2},
+        blocking=True)
+    await hass.async_block_till_done()
+    assert aioclient_mock.call_count == 1
+    payload = aioclient_mock.mock_calls[0][2]
+    seg = payload["seg"][0]
+    assert seg["id"] == 0 and seg["fx"] == 65 and seg["pal"] == 4 and seg["sx"] == 0
+    assert len(seg["col"]) == 3 and all(len(c) == 3 for c in seg["col"])
+    # one segment: the brightness goes to the whole strip
+    assert "bri" in payload and "bri" not in seg and payload["tt"] == 20 and payload["on"] is True
+    assert turned_on == ["light.bulb"] and published == []
+
+
+async def test_wled_segments_get_their_own_brightness(hass: HomeAssistant, monkeypatch, userdata, aioclient_mock):
+    await _setup(hass, monkeypatch)
+    _wled_lights(hass, [0, 1])
+    aioclient_mock.post("http://192.0.2.10/json/state", json={"success": True})
+    gradient = runtime(hass).gradient
+    assert not gradient.is_gradient("light.strip_master")  # brightness only, no segment
+
+    await hass.services.async_call("scene_studio", "apply_preset", {
+        "preset_id": PRESET, "targets": {"entity_id": ["light.strip_0", "light.strip_1"]}}, blocking=True)
+    await hass.async_block_till_done()
+    segs = sorted((call[2]["seg"][0] for call in aioclient_mock.mock_calls), key=lambda s: s["id"])
+    assert [s["id"] for s in segs] == [0, 1]
+    assert all("bri" in s for s in segs)
+    assert all("bri" not in call[2] for call in aioclient_mock.mock_calls)
+
+
+async def test_wled_gradient_can_be_switched_off(hass: HomeAssistant, monkeypatch, userdata, aioclient_mock):
+    _, turned_on = await _setup(hass, monkeypatch)
+    _wled_lights(hass, [0])
+    await hass.services.async_call("scene_studio", "apply_preset", {
+        "preset_id": PRESET, "targets": {"entity_id": ["light.strip_0"]}, "gradient": False}, blocking=True)
+    await hass.async_block_till_done()
+    assert aioclient_mock.call_count == 0 and turned_on == ["light.strip_0"]
+
+
+async def test_wled_segment_gets_solid_for_one_color(hass: HomeAssistant, monkeypatch, userdata, aioclient_mock):
+    await _setup(hass, monkeypatch)
+    _wled_lights(hass, [0])
+    aioclient_mock.post("http://192.0.2.10/json/state", json={"success": True})
+    bright = "84ebc26c-9d61-4d25-830c-41ea66f1c325"  # Bright, one color
+    await hass.services.async_call("scene_studio", "apply_preset", {
+        "preset_id": bright, "targets": {"entity_id": ["light.strip_0"]}}, blocking=True)
+    await hass.async_block_till_done()
+    seg = aioclient_mock.mock_calls[0][2]["seg"][0]
+    assert seg["fx"] == 0 and len(seg["col"]) == 1 and "pal" not in seg

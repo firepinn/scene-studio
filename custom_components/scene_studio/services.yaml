@@ -78,7 +78,7 @@ apply_preset:
         object:
     gradient:
       name: "Gradient lamps"
-      description: "Optional, default true. Gradient lamps (e.g. Hue Signe or Play gradient in Zigbee2MQTT) show all colors of the preset as a gradient. false: one color like any other lamp."
+      description: "Optional, default true. Gradient lamps (e.g. Hue Signe or Play gradient in Zigbee2MQTT, WLED segments) show all colors of the preset as a gradient. false: one color like any other lamp."
       selector:
         boolean:
     saturation:
@@ -208,7 +208,7 @@ start_dynamic_scene:
         object:
     gradient:
       name: "Gradient lamps"
-      description: "Optional, default true. Gradient lamps (e.g. Hue Signe or Play gradient in Zigbee2MQTT) show all colors of the preset as a gradient. false: one color like any other lamp."
+      description: "Optional, default true. Gradient lamps (e.g. Hue Signe or Play gradient in Zigbee2MQTT, WLED segments) show all colors of the preset as a gradient. false: one color like any other lamp."
       selector:
         boolean:
     saturation:
@@ -375,7 +375,7 @@ save_scene:
         object:
     gradient:
       name: "Gradient lamps"
-      description: "Optional, default true. Gradient lamps (e.g. Hue Signe or Play gradient in Zigbee2MQTT) show all colors of the preset as a gradient. false: one color like any other lamp."
+      description: "Optional, default true. Gradient lamps (e.g. Hue Signe or Play gradient in Zigbee2MQTT, WLED segments) show all colors of the preset as a gradient. false: one color like any other lamp."
       selector:
         boolean:
     saturation:

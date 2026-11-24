@@ -1,6 +1,7 @@
 # Modified by andrejem (2026): optional brightness per light (light_brightness), runtime presets,
 # gradient lamps get the preset colors as gradient (gradient.py), main and accent lights of music
 # scenes take their colors from their own part of the preset (roles, pools).
+# Modified by firepinn (2026): WLED segments get one-color presets through gradient.py too (Solid).
 
 import voluptuous as vol
 import asyncio
@@ -120,6 +121,10 @@ async def apply_preset(
             tasks.append(gradients.async_apply(
                 entity_id, gradient_colors(preset_colors, next_color), light_params["brightness"], transition,
             ))
+            continue
+        if color_support and gradients is not None and gradients.needs_single_color(entity_id):
+            # A WLED segment ends the gradient of the last scene (Solid) instead of keeping it around the color
+            tasks.append(gradients.async_apply(entity_id, [next_color], light_params["brightness"], transition))
             continue
 
         if color_support:

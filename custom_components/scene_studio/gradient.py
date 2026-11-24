@@ -5,11 +5,17 @@
 # Zigbee2MQTT reads the hex colors of a gradient as linear "Wide RGB D65" values, without the sRGB
 # gamma of normal colors: the colors are converted the same way, so the lamp gets exactly the xy of
 # the preset (with the usual sRGB conversion they came out pale, almost white).
+# Modified by firepinn (2026): WLED segments are gradient lamps too. Their colors go to the WLED JSON
+# API as the three colors of the segment with the effect "Palette" and the palette "* Color Gradient",
+# which blends them along the strip (the light entity of WLED knows only one color as well).
 
+import asyncio
 import json
 import logging
 
 from homeassistant.core import HomeAssistant, callback
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
+from homeassistant.util.color import color_xy_to_RGB
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
 
@@ -17,6 +23,14 @@ _LOGGER = logging.getLogger(__name__)
 
 MAX_GRADIENT_COLORS = 5
 GRADIENT_STYLE = "linear"
+
+# WLED: a segment has three color slots; effect 65 "Palette" shows the palette standing still with
+# speed 0, palette 4 "* Color Gradient" is the gradient of the three slots
+WLED_MAX_COLORS = 3
+WLED_FX_SOLID = 0
+WLED_FX_PALETTE = 65
+WLED_PAL_COLOR_GRADIENT = 4
+WLED_TIMEOUT = 5
 
 
 def _hex(xy) -> str:
@@ -46,8 +60,18 @@ def gradient_colors(preset_colors, first_color) -> list:
     return [colors[(start + i) % len(colors)] for i in range(count)]
 
 
+def wled_colors(colors) -> list:
+    """Up to three colors for a WLED segment, spread over the colors of the gradient (first and last kept).
+    Repeated colors count once: presets often end with their first color again."""
+    colors = list(dict.fromkeys(tuple(c) for c in colors))
+    if len(colors) <= WLED_MAX_COLORS:
+        return colors
+    last = len(colors) - 1
+    return [colors[round(i * last / (WLED_MAX_COLORS - 1))] for i in range(WLED_MAX_COLORS)]
+
+
 class GradientLights:
-    """Finds gradient lamps in Zigbee2MQTT and sends gradients to them."""
+    """Finds gradient lamps (Zigbee2MQTT, WLED segments) and sends gradients to them."""
 
     def __init__(self, hass: HomeAssistant):
         self.hass = hass
@@ -114,8 +138,34 @@ class GradientLights:
         if lights:
             _LOGGER.debug("Gradient lights: %s", ", ".join(sorted(lights)))
 
+    @callback
+    def _wled_segment(self, entity_id: str):
+        """(host, segment id, single segment) of a WLED segment light, None for other lights.
+
+        The WLED integration gives segment lights the unique id <mac>_<segment> and the master light
+        (brightness only, exists with two or more segments) the unique id <mac>."""
+        entry = er.async_get(self.hass).async_get(entity_id)
+        if entry is None or entry.platform != "wled" or entry.domain != "light" or "_" not in entry.unique_id:
+            return None
+        mac, _, segment = entry.unique_id.rpartition("_")
+        if not segment.isdigit() or entry.config_entry_id is None:
+            return None
+        config_entry = self.hass.config_entries.async_get_entry(entry.config_entry_id)
+        host = config_entry.data.get("host") if config_entry is not None else None
+        if not host:
+            return None
+        master = er.async_get(self.hass).async_get_entity_id("light", "wled", mac)
+        master_state = self.hass.states.get(master) if master else None
+        single = master_state is None or master_state.state == "unavailable"
+        return host, int(segment), single
+
     def is_gradient(self, entity_id: str) -> bool:
-        return entity_id in self._lights
+        return entity_id in self._lights or self._wled_segment(entity_id) is not None
+
+    def needs_single_color(self, entity_id: str) -> bool:
+        """WLED segments get a one-color preset here too: it switches them to Solid, so the gradient of
+        the last scene does not stay around the new color."""
+        return entity_id not in self._lights and self._wled_segment(entity_id) is not None
 
     def register(self, entity_id: str, topic: str):
         """Mainly for tests: treat a light as gradient lamp with this MQTT topic."""
@@ -123,6 +173,8 @@ class GradientLights:
 
     async def async_apply(self, entity_id: str, colors, brightness, transition) -> bool:
         """Send a gradient to the lamp. False if the lamp is no gradient lamp or MQTT failed."""
+        if entity_id not in self._lights and (wled := self._wled_segment(entity_id)) is not None:
+            return await self._async_apply_wled(entity_id, *wled, colors, brightness, transition)
         topic = self._lights.get(entity_id)
         if topic is None or not colors:
             return False
@@ -141,5 +193,34 @@ class GradientLights:
             await mqtt.async_publish(self.hass, f"{topic}/set", json.dumps(payload))
         except Exception as err:  # noqa: BLE001 - fall back to one color
             _LOGGER.warning("Gradient for %s could not be sent: %s", entity_id, err)
+            return False
+        return True
+
+    async def _async_apply_wled(self, entity_id, host, segment, single, colors, brightness, transition) -> bool:
+        """Send the gradient to a WLED segment over the JSON API. False if WLED could not be reached."""
+        if not colors:
+            return False
+        colors = wled_colors(colors)
+        seg = {"id": segment, "on": True, "col": [list(color_xy_to_RGB(float(x), float(y))) for x, y in colors]}
+        if len(colors) > 1:
+            seg.update({"fx": WLED_FX_PALETTE, "sx": 0, "pal": WLED_PAL_COLOR_GRADIENT})
+        else:
+            seg["fx"] = WLED_FX_SOLID
+        payload = {"on": True, "seg": [seg]}
+        if brightness is not None:
+            # One segment: the brightness of the light entity is the brightness of the whole strip
+            if single:
+                payload["bri"] = int(brightness)
+            else:
+                seg["bri"] = int(brightness)
+        if transition is not None:
+            payload["tt"] = round(float(transition) * 10)  # tenths of a second, only for this change
+        try:
+            session = async_get_clientsession(self.hass)
+            async with asyncio.timeout(WLED_TIMEOUT):
+                response = await session.post(f"http://{host}/json/state", json=payload)
+                response.raise_for_status()
+        except Exception as err:  # noqa: BLE001 - fall back to one color
+            _LOGGER.warning("Gradient for %s could not be sent to WLED: %s", entity_id, err)
             return False
         return True
