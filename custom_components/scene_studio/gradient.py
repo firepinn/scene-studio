@@ -31,6 +31,7 @@ WLED_MAX_COLORS = 3
 WLED_FX_SOLID = 0
 WLED_FX_PALETTE = 65
 WLED_PAL_COLOR_GRADIENT = 4
+WLED_PALETTE_SIZE = 120  # index 0-239 of the palette: all of it except the wrap back to the start
 WLED_TIMEOUT = 5
 
 
@@ -213,11 +214,13 @@ class GradientLights:
         colors = wled_colors(colors)
         seg = {"id": segment, "on": True, "col": [list(color_xy_to_RGB(float(x), float(y))) for x, y in colors]}
         if len(colors) > 1:
-            # Palette: shift 0, size 128 = the palette exactly once, rotation 0 = along the strip (128 turns
-            # it by 90 degrees: one color on a 1D strip), no animated shift or rotation. Set every time,
-            # because the segment keeps the slider values of earlier effects.
+            # Palette: shift 0, rotation 0 = along the strip (128 turns it by 90 degrees: one color on a
+            # 1D strip), no animated shift or rotation. Size 128 would show the palette once, but the
+            # effect wraps it (index 240-255 blends from the last color back to the first, so the strip
+            # ends in its first color again); 120 stops at index 239. Set every time, because the segment
+            # keeps the slider values of earlier effects.
             seg.update({"fx": WLED_FX_PALETTE, "pal": WLED_PAL_COLOR_GRADIENT,
-                        "sx": 0, "ix": 128, "c1": 0, "o1": False, "o2": False})
+                        "sx": 0, "ix": WLED_PALETTE_SIZE, "c1": 0, "o1": False, "o2": False})
         else:
             seg["fx"] = WLED_FX_SOLID
         payload = {"on": True, "seg": [seg]}

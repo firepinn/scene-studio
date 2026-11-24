@@ -170,8 +170,8 @@ async def test_wled_segment_gets_a_palette_gradient(hass: HomeAssistant, monkeyp
     payload = aioclient_mock.mock_calls[0][2]
     seg = payload["seg"][0]
     assert seg["id"] == 0 and seg["fx"] == 65 and seg["pal"] == 4 and seg["sx"] == 0
-    # whole palette once, along the strip, standing still (whatever the sliders were before)
-    assert seg["ix"] == 128 and seg["c1"] == 0 and seg["o1"] is False and seg["o2"] is False
+    # palette once without the wrap back to its start, along the strip, standing still
+    assert seg["ix"] == 120 and seg["c1"] == 0 and seg["o1"] is False and seg["o2"] is False
     assert len(seg["col"]) == 3 and all(len(c) == 3 for c in seg["col"])
     # one segment: the brightness goes to the whole strip
     assert "bri" in payload and "bri" not in seg and payload["tt"] == 20 and payload["on"] is True
